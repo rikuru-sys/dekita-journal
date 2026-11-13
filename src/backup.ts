@@ -1,3 +1,4 @@
+import type { FileEntry } from "@zip.js/zip.js/lib/zip-core-native.js";
 import { checkGeneration, readSettings, validReminderTime } from "./db";
 import type { JournalDatabase, ReminderSettings } from "./db";
 import { careEffects, categories, validDateKey, weatherLabels, weekdayIndexes } from "./model";
@@ -6,6 +7,7 @@ import { conditionScores, moods, severities, symptomFields } from "./wellbeing";
 
 const backupFormat = "dekita-journal";
 const backupVersion = 1;
+const maxZipBackupBytes = 64 * 1024 * 1024;
 
 export interface JournalBackup {
   format: typeof backupFormat;
@@ -104,6 +106,43 @@ export function parseBackup(text: string): JournalBackup {
     throw new InvalidBackup("バックアップに読み込めないデータがあります。");
   }
   return { format: backupFormat, version: backupVersion, exportedAt, items, days, reminder };
+}
+
+async function readBackupZip(file: File): Promise<string> {
+  const sizeError = "ZIPファイルまたは展開後のJSONが大きすぎます。JSONファイルを直接選んでください。";
+  if (file.size > maxZipBackupBytes) throw new InvalidBackup(sizeError);
+
+  const { BlobReader, TextWriter, ZipReader } = await import("@zip.js/zip.js/lib/zip-core-native.js");
+  const zip = new ZipReader(new BlobReader(file), { useWebWorkers: false });
+  try {
+    const jsonFiles = (await zip.getEntries()).filter((entry): entry is FileEntry =>
+      !entry.directory && /\.json$/i.test(entry.filename) &&
+      !/(?:^|\/)(?:__MACOSX\/|\._)/.test(entry.filename),
+    );
+    if (jsonFiles.length !== 1) {
+      throw new InvalidBackup("ZIPの中にバックアップのJSONファイルを1つ入れてください。");
+    }
+
+    const [entry] = jsonFiles;
+    if (entry.encrypted) {
+      throw new InvalidBackup("パスワード付きのZIPです。バックアップのJSONファイルを直接選んでください。");
+    }
+    if (entry.uncompressedSize > maxZipBackupBytes) throw new InvalidBackup(sizeError);
+    return await entry.getData(new TextWriter(), { checkSignature: true });
+  } catch (error) {
+    if (error instanceof InvalidBackup) throw error;
+    throw new InvalidBackup("ZIPファイルを展開できませんでした。ファイルを確認してください。", { cause: error });
+  } finally {
+    await zip.close();
+  }
+}
+
+export async function readBackupFile(file: File): Promise<JournalBackup> {
+  const signature = new Uint8Array(await file.slice(0, 4).arrayBuffer());
+  const hasZipSignature = signature[0] === 0x50 && signature[1] === 0x4b &&
+    ((signature[2] === 3 && signature[3] === 4) || (signature[2] === 5 && signature[3] === 6));
+  const text = hasZipSignature || /\.zip$/i.test(file.name) ? await readBackupZip(file) : await file.text();
+  return parseBackup(text);
 }
 
 export async function createBackup(database: JournalDatabase): Promise<JournalBackup> {

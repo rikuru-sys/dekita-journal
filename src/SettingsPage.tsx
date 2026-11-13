@@ -1,7 +1,7 @@
 import { Bell, Download, HardDrive, SlidersHorizontal, Upload } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { createBackup, InvalidBackup, parseBackup, restoreBackup } from "./backup";
+import { createBackup, InvalidBackup, readBackupFile, restoreBackup } from "./backup";
 import type { JournalBackup } from "./backup";
 import { db, RestoreConflict, validReminderTime } from "./db";
 import type { JournalSettings, ReminderSettings } from "./db";
@@ -165,7 +165,7 @@ function BackupCard({ generation, hasDrafts }: { generation: string; hasDrafts: 
     setOperation("read");
     setFeedback(undefined);
     try {
-      const backup = parseBackup(await file.text());
+      const backup = await readBackupFile(file);
       setSelection({ filename: file.name, backup, generation });
     } catch (error) {
       setFeedback({
@@ -206,7 +206,7 @@ function BackupCard({ generation, hasDrafts }: { generation: string; hasDrafts: 
         <IconBadge tone="memo"><HardDrive size={18} strokeWidth={1.8} /></IconBadge>
         <h2 id="backup-title">バックアップ</h2>
       </header>
-      <p className="card-hint">保存した記録、チェック項目、リマインダー設定をJSONファイルにまとめます。</p>
+      <p className="card-hint">保存した記録、チェック項目、リマインダー設定をJSONで書き出せます。復元にはJSONまたはZIPを選べます。</p>
       <div className="backup-actions">
         <button className="button primary" type="button" disabled={!!operation} onClick={() => void exportFile()}>
           <Download size={17} aria-hidden="true" />{operation === "export" ? "書き出し中…" : "JSONを書き出す"}
@@ -214,7 +214,7 @@ function BackupCard({ generation, hasDrafts }: { generation: string; hasDrafts: 
         <button className="button secondary" type="button" disabled={!!operation} onClick={() => fileInput.current?.click()}>
           <Upload size={17} aria-hidden="true" />{operation === "read" ? "読み込み中…" : "ファイルから復元"}
         </button>
-        <input ref={fileInput} type="file" hidden accept=".json,application/json" onChange={(event) => {
+        <input ref={fileInput} type="file" hidden accept=".json,.zip,application/json,application/zip,application/x-zip-compressed" onChange={(event) => {
           const file = event.target.files?.[0];
           event.target.value = "";
           if (file) void readFile(file);

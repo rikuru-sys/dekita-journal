@@ -1,7 +1,8 @@
+import { BlobWriter, TextReader, ZipWriter } from "@zip.js/zip.js/lib/zip-core-native.js";
 import "fake-indexeddb/auto";
 import Dexie from "dexie";
 import { expect, it } from "vitest";
-import { createBackup, InvalidBackup, parseBackup, restoreBackup } from "./backup";
+import { createBackup, InvalidBackup, parseBackup, readBackupFile, restoreBackup } from "./backup";
 import { deleteChecklistItem, JournalDatabase, readSettings, RestoreConflict, saveDay, saveReminder } from "./db";
 import { prepareDraft, starterItems } from "./model";
 
@@ -28,7 +29,15 @@ it("opens a version 1 database and keeps its existing records and checklist", as
   }
 });
 
-it("round-trips records, deleted item history, and reminder settings in a JSON backup", async () => {
+async function makeZipFile(entries: Record<string, string>, filename = "backup.zip", level = 6) {
+  const zip = new ZipWriter(new BlobWriter(), { useWebWorkers: false, level });
+  for (const [path, content] of Object.entries(entries)) {
+    await zip.add(path, new TextReader(content));
+  }
+  return new File([await zip.close()], filename);
+}
+
+it.each(["JSON", "ZIP"] as const)("round-trips records, deleted item history, and reminder settings in a %s backup", async (format) => {
   const source = new JournalDatabase("journal-backup-source-" + crypto.randomUUID());
   const target = new JournalDatabase("journal-backup-target-" + crypto.randomUUID());
   try {
@@ -44,7 +53,11 @@ it("round-trips records, deleted item history, and reminder settings in a JSON b
     await saveReminder(source, { reminderEnabled: false, reminderTime: "21:15" }, "");
 
     const stale = await saveDay(target, { ...draft, memo: "復元前のデータ" });
-    const backup = parseBackup(JSON.stringify(await createBackup(source)));
+    const json = JSON.stringify(await createBackup(source));
+    const file = format === "JSON"
+      ? new File([json], "backup.json", { type: "application/json" })
+      : await makeZipFile({ "保存/backup.JSON": json, "__MACOSX/保存/._backup.JSON": "metadata", "README.txt": "backup" });
+    const backup = await readBackupFile(file);
     await restoreBackup(target, backup, "");
 
     const settings = await readSettings(target);
@@ -59,6 +72,30 @@ it("round-trips records, deleted item history, and reminder settings in a JSON b
     await source.delete();
     await target.delete();
   }
+});
+
+it("recognizes an uncompressed ZIP by its contents", async () => {
+  const backup = {
+    format: "dekita-journal",
+    version: 1,
+    exportedAt: "2026-11-11T12:00:00.000Z",
+    days: [],
+    items: [],
+    reminder: { reminderEnabled: true, reminderTime: "20:30" },
+  };
+  const file = await makeZipFile({ "backup.json": JSON.stringify(backup) }, "backup", 0);
+  await expect(readBackupFile(file)).resolves.toEqual(backup);
+});
+
+it("rejects unreadable or ambiguous ZIP backups", async () => {
+  const badArchive = new File(["not a ZIP"], "backup.zip");
+  const noJson = await makeZipFile({ "notes.txt": "backup" });
+  const multipleJson = await makeZipFile({ "a.json": "{}", "b.json": "{}" });
+  const badBackup = await makeZipFile({ "other.json": "{}" });
+  await expect(readBackupFile(badArchive)).rejects.toThrow("ZIPファイルを展開できませんでした");
+  await expect(readBackupFile(noJson)).rejects.toThrow("バックアップのJSONファイルを1つ");
+  await expect(readBackupFile(multipleJson)).rejects.toThrow("バックアップのJSONファイルを1つ");
+  await expect(readBackupFile(badBackup)).rejects.toThrow("「できたこと記録」で書き出したバックアップ");
 });
 
 it("rejects malformed backups and rolls back a failed restore", async () => {
