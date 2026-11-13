@@ -52,6 +52,10 @@ export const careEffects = {
 } as const;
 export type CareEffect = keyof typeof careEffects;
 
+export const weatherLabels = { sunny: "晴れ", cloudy: "曇り", rainy: "雨" } as const;
+export type Weather = keyof typeof weatherLabels;
+export const weatherOptions = Object.keys(weatherLabels) as Weather[];
+
 export interface ItemRecord {
   item: ItemSnapshot;
   done: boolean;
@@ -64,6 +68,7 @@ export interface DayDraft extends WellbeingRecord {
   revision: number;
   items: ItemRecord[];
   memo: string;
+  weather?: Weather;
 }
 
 export interface DayRecord extends DayDraft {
@@ -151,6 +156,7 @@ export function prepareDraft(
     items,
     memo: base?.memo ?? "",
     revision: base?.revision ?? 0,
+    weather: base?.weather,
     mood: base?.mood,
     symptoms: base?.symptoms,
     conditionOverride: base?.conditionOverride,
@@ -237,6 +243,7 @@ export function sampleRecords(today: DateKey): DayRecord[] {
         ...draft,
         items: draft.items.map((row, i) => ({ ...row, done: i < count })),
         memo: index % 4 === 0 ? "少し外の空気を吸って、気分転換できた。" : "",
+        weather: weatherOptions[index % weatherOptions.length],
         mood: index % 8 === 1 ? undefined : moodIds[index % moodIds.length],
         symptoms: index % 8 === 2 ? undefined : profiles[index % profiles.length],
         revision: 1,

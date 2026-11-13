@@ -19,6 +19,7 @@ it("opens a version 1 database and keeps its existing records and checklist", as
     old.close();
 
     expect(await database.days.get(date)).toEqual(record);
+    expect(prepareDraft(date, [starterItems[0]], await database.days.get(date), date).weather).toBeUndefined();
     expect(await database.items.toArray()).toEqual([starterItems[0]]);
     expect(await readSettings(database)).toMatchObject({ reminderEnabled: true, reminderTime: "20:30" });
   } finally {
@@ -37,7 +38,7 @@ it("round-trips records, deleted item history, and reminder settings in a JSON b
     rest.memo = "少し休んだ";
     rest.effect = "slight";
     const day = await saveDay(source, {
-      ...draft, mood: "calm", symptoms: { fatigue: "strong" }, conditionOverride: 2,
+      ...draft, weather: "rainy", mood: "calm", symptoms: { fatigue: "strong" }, conditionOverride: 2,
     });
     await deleteChecklistItem(source, "rest");
     await saveReminder(source, { reminderEnabled: false, reminderTime: "21:15" }, "");
@@ -53,7 +54,7 @@ it("round-trips records, deleted item history, and reminder settings in a JSON b
     await expect(saveDay(target, { ...stale, memo: "古いタブの変更" })).rejects.toBeInstanceOf(RestoreConflict);
     const edited = prepareDraft(date, backup.items, day, date);
     expect(await saveDay(target, { ...edited, memo: "復元後の編集" }, settings.generation))
-      .toMatchObject({ memo: "復元後の編集", mood: "calm", conditionOverride: 2 });
+      .toMatchObject({ memo: "復元後の編集", weather: "rainy", mood: "calm", conditionOverride: 2 });
   } finally {
     await source.delete();
     await target.delete();
@@ -69,6 +70,7 @@ it("rejects malformed backups and rolls back a failed restore", async () => {
     expect(() => parseBackup("{{")).toThrow(InvalidBackup);
     expect(() => parseBackup(JSON.stringify({ ...backup, version: 100 }))).toThrow(InvalidBackup);
     expect(() => parseBackup(JSON.stringify({ ...backup, days: [{ ...saved, mood: "unknown" }] }))).toThrow(InvalidBackup);
+    expect(() => parseBackup(JSON.stringify({ ...backup, days: [{ ...saved, weather: "snowy" }] }))).toThrow(InvalidBackup);
     expect(() => parseBackup(JSON.stringify({ ...backup, days: [{ ...saved, symptoms: { fatigue: "wrong" } }] }))).toThrow(InvalidBackup);
     expect(() => parseBackup(JSON.stringify({ ...backup, reminder: { reminderEnabled: true, reminderTime: "29:00" } }))).toThrow(InvalidBackup);
 

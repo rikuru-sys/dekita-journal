@@ -1,6 +1,7 @@
-import { Heart, House, Palette, Sprout, Sun, UsersRound } from "lucide-react";
+import { Cloud, CloudRain, Heart, House, Palette, Sprout, Sun, UsersRound } from "lucide-react";
 import type { ReactNode } from "react";
-import type { CategoryId } from "./model";
+import { weatherLabels } from "./model";
+import type { CategoryId, Weather } from "./model";
 
 const categoryIcons = {
   life: House,
@@ -17,6 +18,13 @@ export function IconBadge({ tone, children }: { tone: string; children: ReactNod
 export function CategoryIcon({ category }: { category: CategoryId }) {
   const Icon = categoryIcons[category];
   return <IconBadge tone={category}><Icon size={18} strokeWidth={1.8} /></IconBadge>;
+}
+
+const weatherIcons = { sunny: Sun, cloudy: Cloud, rainy: CloudRain };
+
+export function WeatherLabel({ weather }: { weather: Weather }) {
+  const Icon = weatherIcons[weather];
+  return <span className="weather-label"><Icon size={17} strokeWidth={1.8} aria-hidden="true" />{weatherLabels[weather]}</span>;
 }
 
 export function Brand() {

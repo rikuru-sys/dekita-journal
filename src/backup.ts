@@ -1,6 +1,6 @@
 import { checkGeneration, readSettings, validReminderTime } from "./db";
 import type { JournalDatabase, ReminderSettings } from "./db";
-import { careEffects, categories, validDateKey, weekdayIndexes } from "./model";
+import { careEffects, categories, validDateKey, weatherLabels, weekdayIndexes } from "./model";
 import type { ChecklistItem, DayRecord, ItemRecord, ItemSnapshot, Schedule } from "./model";
 import { conditionScores, moods, severities, symptomFields } from "./wellbeing";
 
@@ -68,6 +68,7 @@ function isDayRecord(value: unknown): value is DayRecord {
     !Array.isArray(value.items) || !value.items.every(isItemRecord) ||
     !unique(value.items.map(({ item }) => item.id))) return false;
 
+  if (value.weather !== undefined && (typeof value.weather !== "string" || !Object.hasOwn(weatherLabels, value.weather))) return false;
   if (value.mood !== undefined && (typeof value.mood !== "string" || !Object.hasOwn(moods, value.mood))) return false;
   if (value.conditionOverride !== undefined && !conditionScores.some((score) => score === value.conditionOverride)) return false;
   return value.symptoms === undefined || (isObject(value.symptoms) &&

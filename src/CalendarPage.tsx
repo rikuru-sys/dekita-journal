@@ -7,7 +7,7 @@ import {
 } from "./model";
 import type { CalendarFilter, CategoryId, ChecklistItem, DateKey, DayRecord } from "./model";
 import { screenLink } from "./navigation";
-import { IconBadge } from "./ui";
+import { IconBadge, WeatherLabel } from "./ui";
 import { conditionLabels, conditionScore, conditionScores, moodIds, moods, severities, symptomFields } from "./wellbeing";
 
 type View = "month" | "year";
@@ -137,17 +137,24 @@ function YearGrid({ month, today, records, filter, mode, onSelect }: Omit<GridPr
 }
 
 function DayWellbeing({ record }: { record: DayRecord }) {
+  const weather = record.weather;
   const mood = record.mood;
   const score = conditionScore(record);
   const symptoms = symptomFields.flatMap(({ id, label }) => {
     const severity = record.symptoms?.[id];
     return severity ? [{ id, label, severity }] : [];
   });
-  if (!mood && !score && symptoms.length === 0) return null;
+  if (!weather && !mood && !score && symptoms.length === 0) return null;
 
   return (
     <div className="day-wellbeing">
       <dl>
+        {weather && (
+          <div>
+            <dt>天気</dt>
+            <dd><span className="wellbeing-mark" data-weather={weather}><WeatherLabel weather={weather} /></span></dd>
+          </div>
+        )}
         {mood && (
           <div>
             <dt>気分</dt>

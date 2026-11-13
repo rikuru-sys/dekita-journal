@@ -2,10 +2,10 @@ import { CalendarDays, Check, ChevronDown, CircleCheck, Leaf, NotebookPen, Slide
 import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { RecordConflict, RestoreConflict } from "./db";
-import { careEffects, categories, dateLabel, doneItems, MAX_DAY_MEMO, MAX_ITEM_MEMO, scheduleLabel } from "./model";
+import { careEffects, categories, dateLabel, doneItems, MAX_DAY_MEMO, MAX_ITEM_MEMO, scheduleLabel, weatherOptions } from "./model";
 import type { CareEffect, ChecklistItem, DateKey, DayDraft, DayRecord, ItemRecord } from "./model";
 import { screenLink } from "./navigation";
-import { CategoryIcon, IconBadge } from "./ui";
+import { CategoryIcon, IconBadge, WeatherLabel } from "./ui";
 import { WellbeingFields } from "./WellbeingFields";
 
 function ChecklistRow({
@@ -125,6 +125,21 @@ export function ReflectionPage({ date, today, saved, draft, catalog, changed, on
       </section>
 
       <form className="reflection-grid" onSubmit={submit}>
+        <section className="panel weather-card" aria-labelledby="weather-title">
+          <header>
+            <h2 id="weather-title">天気</h2>
+            <span className="optional">任意</span>
+          </header>
+          <div className="weather-options" role="group" aria-label="天気を選ぶ">
+            {weatherOptions.map((weather) => (
+              <button key={weather} type="button" className="button secondary" data-weather={weather}
+                aria-pressed={draft.weather === weather} disabled={saving}
+                onClick={() => onChange({ ...draft, weather: draft.weather === weather ? undefined : weather })}>
+                <WeatherLabel weather={weather} />
+              </button>
+            ))}
+          </div>
+        </section>
         <div className="reflection-primary">
           <section className="checklist" aria-labelledby="checklist-title">
             <div className="section-heading">
